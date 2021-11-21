@@ -4,10 +4,10 @@
 import * as React from 'react'
 import {
   fetchPokemon,
-  PokemonForm,
   PokemonDataView,
-  PokemonInfoFallback,
   PokemonErrorBoundary,
+  PokemonForm,
+  PokemonInfoFallback,
 } from '../pokemon'
 
 function asyncReducer(state, action) {
@@ -27,7 +27,7 @@ function asyncReducer(state, action) {
   }
 }
 
-function useAsync(asyncCallback, initialState) {
+function useAsync(initialState) {
   const [state, dispatch] = React.useReducer(asyncReducer, {
     status: 'idle',
     data: null,
@@ -43,42 +43,39 @@ function useAsync(asyncCallback, initialState) {
     }
   }, [])
 
-  React.useEffect(() => {
-    const promise = asyncCallback()
-    if (!promise) {
-      return
-    }
-    dispatch({type: 'pending'})
-    promise.then(
-      data => {
-        if (mounted.current) {
-          dispatch({type: 'resolved', data})
-        }
-      },
-      error => {
-        if (mounted.current) {
-          dispatch({type: 'rejected', error})
-        }
-      },
-    )
-  }, [asyncCallback])
-
-  return state
+  const run = React.useCallback(
+    promise => {
+      dispatch({type: 'pending'})
+      promise.then(
+        data => {
+          if (mounted.current) {
+            dispatch({type: 'resolved', data})
+          }
+        },
+        error => {
+          if (mounted.current) {
+            dispatch({type: 'rejected', error})
+          }
+        },
+      )
+    },
+    [dispatch],
+  )
+  return {...state, run}
 }
 
 function PokemonInfo({pokemonName}) {
-  const asyncCallback = React.useCallback(() => {
-    if (!pokemonName) {
-      return
-    }
-    return fetchPokemon(pokemonName)
-  }, [pokemonName])
-
-  const state = useAsync(asyncCallback, {
+  const {data, status, error, run} = useAsync({
     status: pokemonName ? 'pending' : 'idle',
   })
 
-  const {data, status, error} = state
+  React.useEffect(() => {
+    if (!pokemonName) {
+      return
+    }
+    const pokemonPromise = fetchPokemon(pokemonName)
+    run(pokemonPromise)
+  }, [pokemonName, run])
 
   switch (status) {
     case 'idle':
