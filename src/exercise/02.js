@@ -35,6 +35,14 @@ function useAsync(asyncCallback, initialState) {
     ...initialState,
   })
 
+  const mounted = React.useRef(true)
+
+  React.useEffect(() => {
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
   React.useEffect(() => {
     const promise = asyncCallback()
     if (!promise) {
@@ -43,10 +51,14 @@ function useAsync(asyncCallback, initialState) {
     dispatch({type: 'pending'})
     promise.then(
       data => {
-        dispatch({type: 'resolved', data})
+        if (mounted.current) {
+          dispatch({type: 'resolved', data})
+        }
       },
       error => {
-        dispatch({type: 'rejected', error})
+        if (mounted.current) {
+          dispatch({type: 'rejected', error})
+        }
       },
     )
   }, [asyncCallback])
