@@ -27,35 +27,44 @@ function asyncReducer(state, action) {
   }
 }
 
+function useSafeDispatch(unsafeDispatch) {
+  const mountedRef = React.useRef(false)
+
+  React.useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  return React.useCallback(
+    args => {
+      if (mountedRef.current) {
+        unsafeDispatch(args)
+      }
+    },
+    [unsafeDispatch],
+  )
+}
+
 function useAsync(initialState) {
-  const [state, dispatch] = React.useReducer(asyncReducer, {
+  const [state, unsafeDispatch] = React.useReducer(asyncReducer, {
     status: 'idle',
     data: null,
     error: null,
     ...initialState,
   })
-
-  const mounted = React.useRef(true)
-
-  React.useEffect(() => {
-    return () => {
-      mounted.current = false
-    }
-  }, [])
+  const dispatch = useSafeDispatch(unsafeDispatch)
 
   const run = React.useCallback(
     promise => {
       dispatch({type: 'pending'})
       promise.then(
         data => {
-          if (mounted.current) {
-            dispatch({type: 'resolved', data})
-          }
+          dispatch({type: 'resolved', data})
         },
         error => {
-          if (mounted.current) {
-            dispatch({type: 'rejected', error})
-          }
+          dispatch({type: 'rejected', error})
         },
       )
     },
